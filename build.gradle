@@ -1,7 +1,25 @@
+import org.springframework.boot.gradle.plugin.ResolveMainClassName
+
 plugins {
 	id 'java'
 	id 'org.springframework.boot' version '3.1.0'
 	id 'io.spring.dependency-management' version '1.1.0'
+	id 'distribution'
+	id 'application'
+}
+
+distributions {
+	main {
+		distributionBaseName.set(rootProject.name)
+	}
+}
+
+bootJar {
+	enabled = false
+}
+
+jar {
+	enabled = true
 }
 
 group = 'com.example'
@@ -25,4 +43,35 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+}
+
+tasks.register('installFrontend', Exec){
+	inputs.file(file("frontend/yarn.lock"))
+	inputs.file(file("frontend/package.json"))
+	commandLine("yarn", "--cwd", "frontend", "install")
+}
+
+tasks.register("buildFrontend",Exec){
+	dependsOn("installFrontend")
+	inputs.dir(file("frontend"))
+	outputs.dir(file("frontend/dist"))
+	commandLine("yarn", "--cwd", "frontend", "build")
+}
+
+tasks.register("copyFrontend", Sync){
+	dependsOn("buildFrontend")
+	from(file("./frontend/dist"))
+	into(file("$buildDir/resources/main/static"))
+	doLast {
+		println("copied built frontend to static resources")
+	}
+}
+
+tasks.register("cleanFrontend", Delete){
+	delete(file("./frontend/dist"))
+	delete(file("./src/main/resources/static"))
+}
+
+tasks.withType(ResolveMainClassName).configureEach {
+	dependsOn(copyFrontend)
 }
